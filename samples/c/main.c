@@ -6,7 +6,6 @@
 //
 // Generate the model first:  python generate_model.py
 
-#include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -14,13 +13,14 @@
 #include "onnxruntime_c_api.h"
 
 // Helper macro to check OrtStatus and exit on error
-#define CHECK_ORT_STATUS(status)                                       \
-  do {                                                                 \
-    if (status != NULL) {                                             \
-      fprintf(stderr, "ORT Error: %s\n", OrtGetErrorMessage(status)); \
-      OrtReleaseStatus(status);                                       \
-      exit(EXIT_FAILURE);                                             \
-    }                                                                 \
+#define CHECK_ORT_STATUS(g_ort, status)                                                  \
+  do {                                                                                   \
+    if (status != NULL) {                                                               \
+      const char* error_msg = g_ort->GetErrorMessage(status);                           \
+      fprintf(stderr, "ORT Error: %s\n", error_msg);                                    \
+      g_ort->ReleaseStatus(status);                                                    \
+      exit(EXIT_FAILURE);                                                               \
+    }                                                                                   \
   } while (0)
 
 int main(int argc, char* argv[]) {
@@ -35,7 +35,7 @@ int main(int argc, char* argv[]) {
   // -----------------------------------------------------------------------
   OrtEnv* env = NULL;
   OrtStatus* status = g_ort->CreateEnv(ORT_LOGGING_LEVEL_WARNING, "onnxruntime_sample", &env);
-  CHECK_ORT_STATUS(status);
+  CHECK_ORT_STATUS(g_ort, status);
 
   printf("ONNX Runtime version: %s\n\n", OrtGetVersionString());
 
@@ -44,13 +44,13 @@ int main(int argc, char* argv[]) {
   // -----------------------------------------------------------------------
   OrtSessionOptions* session_options = NULL;
   status = g_ort->CreateSessionOptions(&session_options);
-  CHECK_ORT_STATUS(status);
+  CHECK_ORT_STATUS(g_ort, status);
 
   status = g_ort->SetIntraOpNumThreads(session_options, 1);
-  CHECK_ORT_STATUS(status);
+  CHECK_ORT_STATUS(g_ort, status);
 
   status = g_ort->SetSessionGraphOptimizationLevel(session_options, ORT_ENABLE_BASIC);
-  CHECK_ORT_STATUS(status);
+  CHECK_ORT_STATUS(g_ort, status);
 
   // -----------------------------------------------------------------------
   // 3. Load the ONNX model from a file
@@ -61,23 +61,23 @@ int main(int argc, char* argv[]) {
 
   OrtSession* session = NULL;
   status = g_ort->CreateSession(env, model_path, session_options, &session);
-  CHECK_ORT_STATUS(status);
+  CHECK_ORT_STATUS(g_ort, status);
 
   // -----------------------------------------------------------------------
   // 4. Query model metadata: input/output names and shapes
   // -----------------------------------------------------------------------
   OrtAllocator* allocator = NULL;
   status = g_ort->GetAllocatorWithDefaultOptions(&allocator);
-  CHECK_ORT_STATUS(status);
+  CHECK_ORT_STATUS(g_ort, status);
 
   size_t num_inputs = 0;
   size_t num_outputs = 0;
   
   status = g_ort->SessionGetInputCount(session, &num_inputs);
-  CHECK_ORT_STATUS(status);
+  CHECK_ORT_STATUS(g_ort, status);
   
   status = g_ort->SessionGetOutputCount(session, &num_outputs);
-  CHECK_ORT_STATUS(status);
+  CHECK_ORT_STATUS(g_ort, status);
 
   printf("Model inputs:  %zu\n", num_inputs);
   printf("Model outputs: %zu\n", num_outputs);
@@ -89,7 +89,7 @@ int main(int argc, char* argv[]) {
   for (size_t i = 0; i < num_inputs; ++i) {
     char* name = NULL;
     status = g_ort->SessionGetInputName(session, i, allocator, &name);
-    CHECK_ORT_STATUS(status);
+    CHECK_ORT_STATUS(g_ort, status);
     printf("  Input  %zu: %s\n", i, name);
     input_names[i] = name;
   }
@@ -97,7 +97,7 @@ int main(int argc, char* argv[]) {
   for (size_t i = 0; i < num_outputs; ++i) {
     char* name = NULL;
     status = g_ort->SessionGetOutputName(session, i, allocator, &name);
-    CHECK_ORT_STATUS(status);
+    CHECK_ORT_STATUS(g_ort, status);
     printf("  Output %zu: %s\n", i, name);
     output_names[i] = name;
   }
@@ -117,19 +117,19 @@ int main(int argc, char* argv[]) {
 
   OrtMemoryInfo* memory_info = NULL;
   status = g_ort->CreateMemoryInfo("Cpu", OrtArenaAllocator, 0, OrtMemTypeDefault, &memory_info);
-  CHECK_ORT_STATUS(status);
+  CHECK_ORT_STATUS(g_ort, status);
 
   OrtValue* tensor_a = NULL;
   status = g_ort->CreateTensorWithDataAsOrtValue(
       memory_info, (void*)input_a, sizeof(input_a),
       input_shape, input_shape_len, ONNX_TENSOR_ELEMENT_DATA_TYPE_FLOAT, &tensor_a);
-  CHECK_ORT_STATUS(status);
+  CHECK_ORT_STATUS(g_ort, status);
 
   OrtValue* tensor_b = NULL;
   status = g_ort->CreateTensorWithDataAsOrtValue(
       memory_info, (void*)input_b, sizeof(input_b),
       input_shape, input_shape_len, ONNX_TENSOR_ELEMENT_DATA_TYPE_FLOAT, &tensor_b);
-  CHECK_ORT_STATUS(status);
+  CHECK_ORT_STATUS(g_ort, status);
 
   OrtValue* input_tensors[] = {tensor_a, tensor_b};
   size_t input_tensors_len = 2;
@@ -141,13 +141,13 @@ int main(int argc, char* argv[]) {
 
   OrtRunOptions* run_options = NULL;
   status = g_ort->CreateRunOptions(&run_options);
-  CHECK_ORT_STATUS(status);
+  CHECK_ORT_STATUS(g_ort, status);
 
   OrtValue* output_tensors = NULL;
   status = g_ort->Run(session, run_options,
                       (const char* const*)input_names, input_tensors, input_tensors_len,
                       (const char* const*)output_names, num_outputs, &output_tensors);
-  CHECK_ORT_STATUS(status);
+  CHECK_ORT_STATUS(g_ort, status);
 
   // -----------------------------------------------------------------------
   // 7. Process output
@@ -159,15 +159,15 @@ int main(int argc, char* argv[]) {
 
   float* output_data = NULL;
   status = g_ort->GetTensorMutableData(output_tensors, (void**)&output_data);
-  CHECK_ORT_STATUS(status);
+  CHECK_ORT_STATUS(g_ort, status);
 
   OrtTensorTypeAndShapeInfo* type_info = NULL;
   status = g_ort->GetTensorTypeAndShape(output_tensors, &type_info);
-  CHECK_ORT_STATUS(status);
+  CHECK_ORT_STATUS(g_ort, status);
 
   size_t output_count = 0;
   status = g_ort->GetTensorShapeElementCount(type_info, &output_count);
-  CHECK_ORT_STATUS(status);
+  CHECK_ORT_STATUS(g_ort, status);
 
   printf("\nInputs:\n");
   printf("  A = [");

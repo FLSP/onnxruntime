@@ -49,7 +49,7 @@ int main(int argc, char* argv[]) {
   status = g_ort->SetIntraOpNumThreads(session_options, 1);
   CHECK_ORT_STATUS(status);
 
-  status = g_ort->SetGraphOptimizationLevel(session_options, ORT_ENABLE_BASIC);
+  status = g_ort->SetSessionGraphOptimizationLevel(session_options, ORT_ENABLE_BASIC);
   CHECK_ORT_STATUS(status);
 
   // -----------------------------------------------------------------------

@@ -23,6 +23,75 @@
     }                                                                                   \
   } while (0)
 
+// Helper function to resolve model path
+// Searches in the following order:
+// 1. Provided path (if absolute or existing relative path)
+// 2. Current directory
+// 3. ../samples/c/ (for build directory layouts)
+// 4. ../samples/cxx/ (for consistency with CXX sample)
+const char* resolve_model_path(const char* model_path) {
+  static char resolved_path[512];
+  FILE* file;
+  
+  // Try the provided path directly
+  file = fopen(model_path, "rb");
+  if (file) {
+    fclose(file);
+    strcpy(resolved_path, model_path);
+    return resolved_path;
+  }
+  
+  // Try current directory
+  char current_path[512];
+  snprintf(current_path, sizeof(current_path), "%s", model_path);
+  file = fopen(current_path, "rb");
+  if (file) {
+    fclose(file);
+    strcpy(resolved_path, current_path);
+    return resolved_path;
+  }
+  
+  // Try ../samples/c/
+  snprintf(current_path, sizeof(current_path), "../samples/c/%s", model_path);
+  file = fopen(current_path, "rb");
+  if (file) {
+    fclose(file);
+    strcpy(resolved_path, current_path);
+    return resolved_path;
+  }
+  
+  // Try ../../samples/c/ (for deeper build directories)
+  snprintf(current_path, sizeof(current_path), "../../samples/c/%s", model_path);
+  file = fopen(current_path, "rb");
+  if (file) {
+    fclose(file);
+    strcpy(resolved_path, current_path);
+    return resolved_path;
+  }
+  
+  // Try ../samples/cxx/ (for consistency with CXX sample)
+  snprintf(current_path, sizeof(current_path), "../samples/cxx/%s", model_path);
+  file = fopen(current_path, "rb");
+  if (file) {
+    fclose(file);
+    strcpy(resolved_path, current_path);
+    return resolved_path;
+  }
+  
+  // Try ../../samples/cxx/
+  snprintf(current_path, sizeof(current_path), "../../samples/cxx/%s", model_path);
+  file = fopen(current_path, "rb");
+  if (file) {
+    fclose(file);
+    strcpy(resolved_path, current_path);
+    return resolved_path;
+  }
+  
+  // Could not find the file, return the original path for error reporting
+  strcpy(resolved_path, model_path);
+  return resolved_path;
+}
+
 int main(int argc, char* argv[]) {
   const OrtApi* g_ort = OrtGetApiBase()->GetApi(ORT_API_VERSION);
   if (!g_ort) {
@@ -56,7 +125,9 @@ int main(int argc, char* argv[]) {
   // 3. Load the ONNX model from a file
   //    Generate with:  python generate_model.py
   // -----------------------------------------------------------------------
-  const char* model_path = (argc > 1) ? argv[1] : "add_model.onnx";
+  const char* model_filename = (argc > 1) ? argv[1] : "add_model.onnx";
+  const char* model_path = resolve_model_path(model_filename);
+  
   printf("Loading model: %s\n", model_path);
 
   OrtSession* session = NULL;

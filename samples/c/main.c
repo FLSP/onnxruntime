@@ -37,7 +37,7 @@ int main(int argc, char* argv[]) {
   OrtStatus* status = g_ort->CreateEnv(ORT_LOGGING_LEVEL_WARNING, "onnxruntime_sample", &env);
   CHECK_ORT_STATUS(g_ort, status);
 
-  printf("ONNX Runtime version: %s\n\n", OrtGetVersionString());
+  printf("ONNX Runtime version: %s\n\n", OrtGetApiBase()->GetVersionString());
 
   // -----------------------------------------------------------------------
   // 2. Create session options (could add execution providers here)
